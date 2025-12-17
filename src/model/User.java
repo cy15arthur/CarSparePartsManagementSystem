@@ -201,12 +201,12 @@ public class User {
             return false;
         }
         User user = (User) obj;
-        return Objects.equals(userId, user.userId) && Objects.equals(username, user.username);
+        return Objects.equals(userId, user.userId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(userId, username);
+        return Objects.hash(userId);
     }
 }
 

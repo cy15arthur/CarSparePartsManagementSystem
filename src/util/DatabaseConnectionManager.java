@@ -17,7 +17,8 @@ public final class DatabaseConnectionManager {
     private static final Logger LOGGER = Logger.getLogger(DatabaseConnectionManager.class.getName());
     
     // Database configuration constants
-    private static final String JDBC_URL = "jdbc:mysql://localhost:3306/car_spare_parts_db";
+    // Using test database to avoid conflicts with production database
+    private static final String JDBC_URL = "jdbc:mysql://localhost:3306/car_spare_parts_test_db";
     private static final String DB_USERNAME = "cyitatire";
     private static final String DB_PASSWORD = "cyitatire";
     
