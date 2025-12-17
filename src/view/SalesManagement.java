@@ -1,566 +1,458 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
- */
 package view;
 
-import dao.SalesDao;
-import dao.SalesDaoImpl;
+import dao.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import javax.swing.JOptionPane;
-import model.Sales;
+import java.util.List;
+import javax.swing.*;
+import javax.swing.border.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.plaf.basic.BasicButtonUI; // <--- CRITICAL IMPORT
+import java.awt.*;
+import java.awt.event.*;
+import model.*;
 import util.UITheme;
 
-/**
- * Modern Sales Management interface with professional styling.
- * 
- * @author cyita
- */
-public class SalesManagement extends javax.swing.JFrame {
+public class SalesManagement extends JFrame {
     
+    private final SalesDao salesDao = new SalesDaoImpl();
     private static final java.util.logging.Logger logger = 
         java.util.logging.Logger.getLogger(SalesManagement.class.getName());
 
-    /**
-     * Creates new form SalesManagement
-     */
+    private JPanel mainPanel, headerPanel, contentPanel, formPanel, buttonPanel, tablePanel;
+    private JLabel titleLabel, subtitleLabel;
+    private JTextField salesIdTxt, quantityTxt, totalPriceTxt, salesDateTxt;
+    private JComboBox<String> partComboTxt, customerComboTxt;
+    private JButton backButton, searchBtn, saveBtn, displayBtn;
+    private JScrollPane tableScrollPane;
+    private JTable salesTable;
+
     public SalesManagement() {
         initComponents();
+        setLocationRelativeTo(null);
         loadPartsToCombo();
         loadCustomersToCombo();
+        loadSalesToTable();
+    }
 
+    private void initComponents() {
+        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setTitle("Sales Management - Car Spare Parts System");
+        setResizable(true);
+        setMinimumSize(new Dimension(1300, 750));
+
+        mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(UITheme.BACKGROUND_LIGHT);
+
+        createHeader();
+        createContent();
+
+        getContentPane().add(mainPanel);
+        pack();
+    }
+
+    private void createHeader() {
+        headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(UITheme.PRIMARY);
+        headerPanel.setPreferredSize(new Dimension(1300, 100));
+        headerPanel.setBorder(new EmptyBorder(20, 40, 20, 40));
+
+        JPanel leftPanel = new JPanel();
+        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
+        leftPanel.setOpaque(false);
+
+        titleLabel = new JLabel("Sales Management");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        titleLabel.setForeground(UITheme.TEXT_WHITE);
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        subtitleLabel = new JLabel("Record and manage sales transactions");
+        subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        subtitleLabel.setForeground(new Color(255, 255, 255, 180));
+        subtitleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        subtitleLabel.setBorder(new EmptyBorder(5, 0, 0, 0));
+
+        leftPanel.add(titleLabel);
+        leftPanel.add(subtitleLabel);
+
+        // --- Back Button Fix ---
+        backButton = new JButton("← Back to Dashboard");
+        backButton.setUI(new BasicButtonUI()); // The Fix
+        backButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        backButton.setForeground(UITheme.TEXT_WHITE);
+        backButton.setBackground(new Color(52, 73, 94));
+        backButton.setBorder(new EmptyBorder(12, 30, 12, 30));
+        backButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        backButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                new AdminDashboard().setVisible(true);
+                dispose();
+            }
+        });
+        setupButtonHover(backButton, new Color(52, 73, 94), new Color(44, 62, 80));
+
+        headerPanel.add(leftPanel, BorderLayout.WEST);
+        headerPanel.add(backButton, BorderLayout.EAST);
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+    }
+
+    private void createContent() {
+        contentPanel = new JPanel(new GridBagLayout());
+        contentPanel.setBackground(UITheme.BACKGROUND_LIGHT);
+        contentPanel.setBorder(new EmptyBorder(30, 40, 30, 40));
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.BOTH;
+
+        // Form on Left
+        createFormPanel();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0.35;
+        gbc.weighty = 1.0;
+        gbc.insets = new Insets(0, 0, 0, 20);
+        contentPanel.add(formPanel, gbc);
+
+        // Table on Right
+        createTablePanel();
+        gbc.gridx = 1;
+        gbc.weightx = 0.65;
+        gbc.insets = new Insets(0, 0, 0, 0);
+        contentPanel.add(tablePanel, gbc);
+
+        mainPanel.add(contentPanel, BorderLayout.CENTER);
+    }
+
+    private void createFormPanel() {
+        formPanel = new JPanel();
+        formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
+        formPanel.setBackground(UITheme.SURFACE);
+        formPanel.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(230, 230, 230), 1, true),
+            new EmptyBorder(30, 30, 30, 30)
+        ));
+
+        addFormField("Sales ID", salesIdTxt = createTextField());
+        addFormCombo("Select Part", partComboTxt = createComboBox());
+        addFormCombo("Select Customer", customerComboTxt = createComboBox());
+        addFormField("Quantity", quantityTxt = createTextField());
+        addFormField("Total Price", totalPriceTxt = createTextField());
+        addFormField("Sale Date (yyyy-MM-dd)", salesDateTxt = createTextField());
+
+        createButtons();
+        formPanel.add(Box.createVerticalGlue());
+    }
+
+    private void createButtons() {
+        buttonPanel = new JPanel(new GridLayout(1, 2, 15, 0));
+        buttonPanel.setOpaque(false);
+        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        buttonPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
+        buttonPanel.setBorder(new EmptyBorder(20, 0, 0, 0));
+
+        saveBtn = createButton("Save Sale", UITheme.BUTTON_SECONDARY, new Color(23, 162, 184));
+        saveBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) { saveBtnActionPerformed(); }
+        });
+
+        searchBtn = createButton("Search", UITheme.INFO, new Color(23, 162, 184));
+        searchBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) { searchBtnActionPerformed(); }
+        });
+
+        buttonPanel.add(saveBtn);
+        buttonPanel.add(searchBtn);
+        formPanel.add(buttonPanel);
+    }
+
+    private void createTablePanel() {
+        tablePanel = new JPanel(new BorderLayout());
+        tablePanel.setBackground(UITheme.SURFACE);
+        tablePanel.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(230, 230, 230), 1, true),
+            new EmptyBorder(20, 20, 20, 20)
+        ));
+
+        JPanel titlePanel = new JPanel(new BorderLayout());
+        titlePanel.setOpaque(false);
+        titlePanel.setBorder(new EmptyBorder(0, 0, 15, 0));
+
+        JLabel tableTitle = new JLabel("Sales Transactions");
+        tableTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        tableTitle.setForeground(UITheme.TEXT_PRIMARY);
+
+        // --- Refresh Button Fix ---
+        displayBtn = new JButton("Refresh");
+        displayBtn.setUI(new BasicButtonUI()); // The Fix
+        displayBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        displayBtn.setForeground(UITheme.TEXT_WHITE);
+        displayBtn.setBackground(UITheme.BUTTON_PRIMARY);
+        displayBtn.setBorder(new EmptyBorder(8, 16, 8, 16));
+        displayBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        displayBtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) { loadSalesToTable(); }
+        });
+        setupButtonHover(displayBtn, UITheme.BUTTON_PRIMARY, UITheme.PRIMARY);
+
+        titlePanel.add(tableTitle, BorderLayout.WEST);
+        titlePanel.add(displayBtn, BorderLayout.EAST);
+
+        salesTable = new JTable();
+        salesTable.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        salesTable.setRowHeight(40);
+        salesTable.setGridColor(new Color(240, 240, 240));
+        salesTable.setSelectionBackground(UITheme.PRIMARY_LIGHT);
+        salesTable.setSelectionForeground(UITheme.TEXT_PRIMARY);
+        salesTable.setShowVerticalLines(false);
+        salesTable.setIntercellSpacing(new Dimension(0, 1));
+        
+        salesTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
+        salesTable.getTableHeader().setBackground(UITheme.BACKGROUND_DARK);
+        salesTable.getTableHeader().setForeground(UITheme.TEXT_PRIMARY);
+        
+        salesTable.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent evt) {
+                int row = salesTable.getSelectedRow();
+                if (row != -1) {
+                    salesIdTxt.setText(salesTable.getValueAt(row, 0).toString());
+                    partComboTxt.setSelectedItem(salesTable.getValueAt(row, 1).toString());
+                    customerComboTxt.setSelectedItem(salesTable.getValueAt(row, 2).toString());
+                    quantityTxt.setText(salesTable.getValueAt(row, 3).toString());
+                    totalPriceTxt.setText(salesTable.getValueAt(row, 4).toString());
+                    salesDateTxt.setText(salesTable.getValueAt(row, 5).toString());
+                    salesIdTxt.setEditable(false);
+                }
+            }
+        });
+
+        tableScrollPane = new JScrollPane(salesTable);
+        tableScrollPane.setBorder(new LineBorder(new Color(230, 230, 230), 1));
+
+        tablePanel.add(titlePanel, BorderLayout.NORTH);
+        tablePanel.add(tableScrollPane, BorderLayout.CENTER);
+    }
+
+    // --- HELPER METHODS ---
+
+    private void addFormField(String labelText, JTextField field) {
+        JLabel label = createLabel(labelText);
+        if (formPanel.getComponentCount() > 0) {
+            label.setBorder(new EmptyBorder(15, 0, 0, 0));
+        }
+        formPanel.add(label);
+        formPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+        formPanel.add(field);
+    }
+
+    private void addFormCombo(String labelText, JComboBox<String> combo) {
+        JLabel label = createLabel(labelText);
+        label.setBorder(new EmptyBorder(15, 0, 0, 0));
+        formPanel.add(label);
+        formPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+        formPanel.add(combo);
+    }
+
+    private JLabel createLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        label.setForeground(UITheme.TEXT_PRIMARY);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return label;
+    }
+
+    private JTextField createTextField() {
+        JTextField field = new JTextField();
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        field.setBackground(UITheme.SURFACE);
+        field.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(200, 200, 200), 1, true),
+            new EmptyBorder(10, 12, 10, 12)
+        ));
+        field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
+        field.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return field;
+    }
+
+    private JComboBox<String> createComboBox() {
+        JComboBox<String> combo = new JComboBox<String>();
+        combo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        combo.setBackground(UITheme.SURFACE);
+        combo.setBorder(new LineBorder(new Color(200, 200, 200), 1, true));
+        combo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
+        combo.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return combo;
     }
 
     /**
-     * This method is called from within the constructor to initialize the form.
-     * WARNING: Do NOT modify this code. The content of this method is always
-     * regenerated by the Form Editor.
+     * APPLIED FIX: Using BasicButtonUI
      */
-    @SuppressWarnings("unchecked")
-    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
-    private void initComponents() {
-
-        jPanel1 = new javax.swing.JPanel();
-        jPanel2 = new javax.swing.JPanel();
-        salesDate = new javax.swing.JLabel();
-        part = new javax.swing.JLabel();
-        salesIdTxt = new javax.swing.JTextField();
-        salesId = new javax.swing.JLabel();
-        partComboTxt = new javax.swing.JComboBox<>();
-        customer = new javax.swing.JLabel();
-        customerComboTxt = new javax.swing.JComboBox<>();
-        quantity = new javax.swing.JLabel();
-        salesDateTxt = new javax.swing.JTextField();
-        quantityTxt = new javax.swing.JTextField();
-        totalPrice = new javax.swing.JLabel();
-        totalPriceTxt = new javax.swing.JTextField();
-        searchBtn = new javax.swing.JButton();
-        savebtn = new javax.swing.JButton();
-        jLabel1 = new javax.swing.JLabel();
-        jScrollPane1 = new javax.swing.JScrollPane();
-        salesTable = new javax.swing.JTable();
-        displayBtn = new javax.swing.JButton();
-        jButton1 = new javax.swing.JButton();
-
-        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("Sales Management");
-        setLocationRelativeTo(null);
-
-        jPanel1.setBackground(UITheme.BACKGROUND_LIGHT);
-
-        jPanel2.setBackground(UITheme.SURFACE);
-        jPanel2.setBorder(UITheme.createCardBorder());
-
-        salesDate.setFont(UITheme.FONT_BODY_BOLD);
-        salesDate.setForeground(UITheme.TEXT_PRIMARY);
-        salesDate.setText("Sales Date");
-
-        part.setFont(UITheme.FONT_BODY_BOLD);
-        part.setForeground(UITheme.TEXT_PRIMARY);
-        part.setText("Part");
-
-        salesIdTxt.setBorder(UITheme.createInputBorder());
-        salesIdTxt.setFont(UITheme.FONT_BODY);
-        salesIdTxt.setBackground(UITheme.SURFACE);
-
-        salesId.setFont(UITheme.FONT_BODY_BOLD);
-        salesId.setForeground(UITheme.TEXT_PRIMARY);
-        salesId.setText("Sales ID");
-
-        partComboTxt.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-        partComboTxt.setBorder(UITheme.createInputBorder());
-        partComboTxt.setFont(UITheme.FONT_BODY);
-        partComboTxt.setBackground(UITheme.SURFACE);
-
-        customer.setFont(UITheme.FONT_BODY_BOLD);
-        customer.setForeground(UITheme.TEXT_PRIMARY);
-        customer.setText("Customer");
-
-        customerComboTxt.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-        customerComboTxt.setBorder(UITheme.createInputBorder());
-        customerComboTxt.setFont(UITheme.FONT_BODY);
-        customerComboTxt.setBackground(UITheme.SURFACE);
-        customerComboTxt.setOpaque(true);
-        customerComboTxt.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                customerComboTxtActionPerformed(evt);
-            }
-        });
-
-        quantity.setFont(UITheme.FONT_BODY_BOLD);
-        quantity.setForeground(UITheme.TEXT_PRIMARY);
-        quantity.setText("Quantity");
-
-        salesDateTxt.setBorder(UITheme.createInputBorder());
-        salesDateTxt.setFont(UITheme.FONT_BODY);
-        salesDateTxt.setBackground(UITheme.SURFACE);
-        salesDateTxt.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                salesDateTxtActionPerformed(evt);
-            }
-        });
-
-        quantityTxt.setBorder(UITheme.createInputBorder());
-        quantityTxt.setFont(UITheme.FONT_BODY);
-        quantityTxt.setBackground(UITheme.SURFACE);
-
-        totalPrice.setFont(UITheme.FONT_BODY_BOLD);
-        totalPrice.setForeground(UITheme.TEXT_PRIMARY);
-        totalPrice.setText("Total Price");
-
-        totalPriceTxt.setBorder(UITheme.createInputBorder());
-        totalPriceTxt.setFont(UITheme.FONT_BODY);
-        totalPriceTxt.setBackground(UITheme.SURFACE);
-
-        searchBtn.setBackground(UITheme.BUTTON_INFO);
-        searchBtn.setFont(UITheme.FONT_BUTTON);
-        searchBtn.setForeground(UITheme.TEXT_WHITE);
-        searchBtn.setText("Search");
-        searchBtn.setBorder(UITheme.createButtonBorder(UITheme.BUTTON_INFO));
-        searchBtn.setFocusPainted(false);
-        searchBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                searchBtnActionPerformed(evt);
-            }
-        });
-
-        savebtn.setBackground(new java.awt.Color(85, 139, 47));
-        savebtn.setText("Save");
-        savebtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                savebtnActionPerformed(evt);
-            }
-        });
-
-        jLabel1.setFont(new java.awt.Font("Arial", 1, 24)); // NOI18N
-        jLabel1.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel1.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        jLabel1.setText("Sales Management");
-
-        javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
-        jPanel2.setLayout(jPanel2Layout);
-        jPanel2Layout.setHorizontalGroup(
-            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel2Layout.createSequentialGroup()
-                .addGap(19, 19, 19)
-                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                        .addComponent(salesDate)
-                        .addComponent(totalPrice)
-                        .addComponent(quantity)
-                        .addComponent(salesId)
-                        .addComponent(customer)
-                        .addGroup(jPanel2Layout.createSequentialGroup()
-                            .addComponent(savebtn)
-                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                            .addComponent(searchBtn))
-                        .addComponent(salesIdTxt)
-                        .addComponent(partComboTxt, 0, 406, Short.MAX_VALUE)
-                        .addComponent(customerComboTxt, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(quantityTxt)
-                        .addComponent(totalPriceTxt)
-                        .addComponent(salesDateTxt)
-                        .addComponent(part, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addComponent(jLabel1))
-                .addContainerGap(21, Short.MAX_VALUE))
-        );
-        jPanel2Layout.setVerticalGroup(
-            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel2Layout.createSequentialGroup()
-                .addComponent(jLabel1)
-                .addGap(14, 14, 14)
-                .addComponent(salesId)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(salesIdTxt, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(part)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(partComboTxt, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(customer)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(customerComboTxt, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(quantity)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(quantityTxt, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(totalPrice)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(totalPriceTxt, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(salesDate)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(salesDateTxt, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(20, 20, 20)
-                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(searchBtn, javax.swing.GroupLayout.DEFAULT_SIZE, 40, Short.MAX_VALUE)
-                    .addComponent(savebtn, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-        );
-
-        jScrollPane1.setBackground(UITheme.SURFACE);
-        jScrollPane1.setBorder(UITheme.createCardBorder());
-        jScrollPane1.setPreferredSize(null);
-
-        salesTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {null, null, null, null, null},
-                {null, null, null, null, null},
-                {null, null, null, null, null},
-                {null, null, null, null, null}
-            },
-            new String [] {
-                "Sales ID", "PART", "CUSTOMER", "TOTAL PRICE", "DATE"
-            }
-        ) {
-            Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
-            };
-
-            public Class getColumnClass(int columnIndex) {
-                return types [columnIndex];
-            }
-        });
-        salesTable.setFont(UITheme.FONT_BODY);
-        salesTable.setGridColor(UITheme.BORDER_LIGHT);
-        salesTable.setRowHeight(35);
-        salesTable.setSelectionBackground(UITheme.PRIMARY_LIGHT);
-        salesTable.setSelectionForeground(UITheme.TEXT_PRIMARY);
-        salesTable.setBackground(UITheme.SURFACE);
-        salesTable.setForeground(UITheme.TEXT_PRIMARY);
-        salesTable.setShowGrid(true);
-        salesTable.setShowVerticalLines(false);
-        jScrollPane1.setViewportView(salesTable);
-
-        displayBtn.setBackground(new java.awt.Color(150, 185, 248));
-        displayBtn.setText("Display All");
-        displayBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                displayBtnActionPerformed(evt);
-            }
-        });
-
-        jButton1.setBackground(new java.awt.Color(37, 99, 235));
-        jButton1.setText("Home");
-        jButton1.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                jButton1MouseClicked(evt);
-            }
-        });
-
-        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
-        jPanel1.setLayout(jPanel1Layout);
-        jPanel1Layout.setHorizontalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGap(34, 34, 34)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 781, Short.MAX_VALUE)
-                                .addContainerGap(12, Short.MAX_VALUE))
-                            .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(displayBtn)
-                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 122, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(9, 9, 9))))
-        );
-        jPanel1Layout.setVerticalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addComponent(jButton1)
-                        .addGap(15, 15, 15)
-                        .addComponent(displayBtn)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 260, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE))
-                    .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, 477, Short.MAX_VALUE))
-                .addContainerGap())
-        );
-
-        getContentPane().add(jPanel1, java.awt.BorderLayout.CENTER);
-
-        pack();
-    }// </editor-fold>//GEN-END:initComponents
-
-    private void customerComboTxtActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_customerComboTxtActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_customerComboTxtActionPerformed
-
-    private void salesDateTxtActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_salesDateTxtActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_salesDateTxtActionPerformed
-
-    private void searchBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_searchBtnActionPerformed
-        // TODO add your handling code here:
-         String id = salesIdTxt.getText().trim();
-    if (id.isEmpty()) {
-        JOptionPane.showMessageDialog(this, "Enter Sales ID first!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    dao.SalesDao dao = new dao.SalesDaoImpl();
-    model.Sales s = dao.searchById(id);
-
-    if (s == null) {
-        JOptionPane.showMessageDialog(this, "Sale not found!", "INFO", JOptionPane.INFORMATION_MESSAGE);
-        return;
-    }
-
-    partComboTxt.setSelectedItem(s.getPartCode());
-    customerComboTxt.setSelectedItem(s.getCustomerId());
-    quantityTxt.setText(String.valueOf(s.getQuantity()));
-    totalPriceTxt.setText(String.valueOf(s.getTotalPrice()));
-    salesDateTxt.setText(String.valueOf(s.getSaleDate()));
-
-    salesIdTxt.setEditable(false);
-    }//GEN-LAST:event_searchBtnActionPerformed
-
-    private void displayBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_displayBtnActionPerformed
-        // TODO add your handling code here:
-            loadSalesToTable();
-
-    }//GEN-LAST:event_displayBtnActionPerformed
-
-    private void savebtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_savebtnActionPerformed
-        // TODO add your handling code here:
-         if(salesIdTxt.getText().trim().isEmpty()){
-        JOptionPane.showMessageDialog(this, "Sales ID is required!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    if(partComboTxt.getSelectedItem() == null){
-        JOptionPane.showMessageDialog(this, "Select a part!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    if(customerComboTxt.getSelectedItem() == null){
-        JOptionPane.showMessageDialog(this, "Select a customer!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    if(quantityTxt.getText().trim().isEmpty()){
-        JOptionPane.showMessageDialog(this, "Quantity is required!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-     if (!quantityTxt.getText().matches("\\d+")) {
-            JOptionPane.showMessageDialog(this, "Stocl Quantity must contain only positive numbers!", "Error", JOptionPane.ERROR_MESSAGE);
-    return;
-    }
-
-    if(totalPriceTxt.getText().trim().isEmpty()){
-        JOptionPane.showMessageDialog(this, "Price is required!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    if(salesDateTxt.getText().trim().isEmpty()){
-        JOptionPane.showMessageDialog(this, "Sale date is required!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    int qty;
-    double price;
-
-    try {
-        qty = Integer.parseInt(quantityTxt.getText().trim());
-        if(qty <= 0){
-            JOptionPane.showMessageDialog(this, "Quantity must be positive!", "ERROR", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-    } catch (NumberFormatException ex){
-        JOptionPane.showMessageDialog(this, "Quantity must be a number!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    try {
-        price = Double.parseDouble(totalPriceTxt.getText().trim());
-        if(price <= 0){
-            JOptionPane.showMessageDialog(this, "Price must be positive!", "ERROR", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-    } catch (NumberFormatException ex){
-        JOptionPane.showMessageDialog(this, "Price must be a number!", "ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    LocalDateTime saleDate;
-
-    try {
+    private JButton createButton(String text, Color normalColor, Color hoverColor) {
+        JButton btn = new JButton(text);
+        btn.setUI(new BasicButtonUI()); // The Fix
         
-        DateTimeFormatter fmt1 = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        DateTimeFormatter fmt2 = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-        String txt = salesDateTxt.getText().trim();
-
-        if(txt.length() == 10) {
-            // yyyy-MM-dd → convert to midnight
-            saleDate = LocalDate.parse(txt, fmt2).atStartOfDay();
-        } else {
-            saleDate = LocalDateTime.parse(txt, fmt1);
-        }
-
-    } catch (Exception ex){
-        JOptionPane.showMessageDialog(this,
-                "Invalid date format!\nUse: yyyy-MM-dd!",
-                "DATE ERROR", JOptionPane.ERROR_MESSAGE);
-        return;
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btn.setForeground(UITheme.TEXT_WHITE);
+        btn.setBackground(normalColor);
+        btn.setBorder(new EmptyBorder(12, 20, 12, 20));
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        setupButtonHover(btn, normalColor, hoverColor);
+        return btn;
     }
 
-    // ===== 4. BUILD MODEL =====
-    Sales s = new Sales();
-    s.setSalesId(salesIdTxt.getText().trim());
-    s.setPartCode(partComboTxt.getSelectedItem().toString());
-    s.setCustomerId(customerComboTxt.getSelectedItem().toString());
-    s.setQuantity(qty);
-    s.setTotalPrice(qty * price);
-    s.setSaleDate(saleDate);   // Works because field is LocalDateTime
+    private void setupButtonHover(JButton button, Color normalColor, Color hoverColor) {
+        button.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent evt) { button.setBackground(hoverColor); }
+            public void mouseExited(MouseEvent evt) { button.setBackground(normalColor); }
+        });
+    }
 
-    // ===== 5. SAVE TO DB =====
-    SalesDao dao = new SalesDaoImpl();
-    int result = dao.create(s);
+    // --- Logic Implementation ---
 
-    if(result > 0){
-        JOptionPane.showMessageDialog(this, "Sale recorded successfully!");
+    private void saveBtnActionPerformed() {
+        if (!validateFields()) return;
 
-        // Clear form
+        try {
+            int qty = Integer.parseInt(quantityTxt.getText().trim());
+            double price = Double.parseDouble(totalPriceTxt.getText().trim());
+            
+            LocalDateTime saleDate;
+            DateTimeFormatter fmt2 = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            DateTimeFormatter fmt1 = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            String txt = salesDateTxt.getText().trim();
+            
+            if (txt.length() == 10) {
+                saleDate = LocalDate.parse(txt, fmt2).atStartOfDay();
+            } else {
+                saleDate = LocalDateTime.parse(txt, fmt1);
+            }
+
+            Sales s = new Sales();
+            s.setSalesId(salesIdTxt.getText().trim());
+            s.setPartCode(partComboTxt.getSelectedItem().toString());
+            s.setCustomerId(customerComboTxt.getSelectedItem().toString());
+            s.setQuantity(qty);
+            s.setTotalPrice(price);
+            s.setSaleDate(saleDate);
+
+            if (salesDao.create(s) > 0) {
+                JOptionPane.showMessageDialog(this, "Sale recorded successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                clearFields();
+                loadSalesToTable();
+            } else {
+                JOptionPane.showMessageDialog(this, "Failed to save!", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Invalid date format! Use: yyyy-MM-dd", "Date Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void searchBtnActionPerformed() {
+        String id = salesIdTxt.getText().trim();
+        if (id.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Enter Sales ID!", "Missing Input", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        Sales s = salesDao.searchById(id);
+        if (s == null) {
+            JOptionPane.showMessageDialog(this, "Sale not found!", "Not Found", JOptionPane.INFORMATION_MESSAGE);
+            clearFields();
+        } else {
+            partComboTxt.setSelectedItem(s.getPartCode());
+            customerComboTxt.setSelectedItem(s.getCustomerId());
+            quantityTxt.setText(String.valueOf(s.getQuantity()));
+            totalPriceTxt.setText(String.valueOf(s.getTotalPrice()));
+            salesDateTxt.setText(String.valueOf(s.getSaleDate()));
+            salesIdTxt.setEditable(false);
+        }
+    }
+
+    private boolean validateFields() {
+        if (salesIdTxt.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Sales ID required!", "Validation", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        if (partComboTxt.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this, "Select a part!", "Validation", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        if (customerComboTxt.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this, "Select a customer!", "Validation", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        if (quantityTxt.getText().trim().isEmpty() || !quantityTxt.getText().matches("\\d+")) {
+            JOptionPane.showMessageDialog(this, "Valid quantity required!", "Validation", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        if (totalPriceTxt.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Price required!", "Validation", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        if (salesDateTxt.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Date required!", "Validation", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        return true;
+    }
+
+    private void clearFields() {
         salesIdTxt.setText("");
         quantityTxt.setText("");
         totalPriceTxt.setText("");
         salesDateTxt.setText("");
-    } else {
-        JOptionPane.showMessageDialog(this, "Failed to save!", "ERROR", JOptionPane.ERROR_MESSAGE);
+        salesIdTxt.setEditable(true);
     }
-    }//GEN-LAST:event_savebtnActionPerformed
-
-    private void jButton1MouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jButton1MouseClicked
-        // TODO add your handling code here:
-        new HomePage().setVisible(true);
-        this.dispose();
-    }//GEN-LAST:event_jButton1MouseClicked
-
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ReflectiveOperationException | javax.swing.UnsupportedLookAndFeelException ex) {
-            logger.log(java.util.logging.Level.SEVERE, null, ex);
-        }
-        //</editor-fold>
-
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(() -> new SalesManagement().setVisible(true));
-    }
-
-    // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JLabel customer;
-    private javax.swing.JComboBox<String> customerComboTxt;
-    private javax.swing.JButton displayBtn;
-    private javax.swing.JButton jButton1;
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JPanel jPanel1;
-    private javax.swing.JPanel jPanel2;
-    private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JLabel part;
-    private javax.swing.JComboBox<String> partComboTxt;
-    private javax.swing.JLabel quantity;
-    private javax.swing.JTextField quantityTxt;
-    private javax.swing.JLabel salesDate;
-    private javax.swing.JTextField salesDateTxt;
-    private javax.swing.JLabel salesId;
-    private javax.swing.JTextField salesIdTxt;
-    private javax.swing.JTable salesTable;
-    private javax.swing.JButton savebtn;
-    private javax.swing.JButton searchBtn;
-    private javax.swing.JLabel totalPrice;
-    private javax.swing.JTextField totalPriceTxt;
-    // End of variables declaration//GEN-END:variables
-   private void clearFields(){
-    salesIdTxt.setText("");
-    quantityTxt.setText("");
-    totalPriceTxt.setText("");
-    salesDateTxt.setText("");
-    salesIdTxt.setEditable(true);
-}
 
     private void loadSalesToTable() {
-    dao.SalesDao dao = new dao.SalesDaoImpl();
-    java.util.List<model.Sales> list = dao.displayAllSales();
-
-    String[] cols = {"Sales ID", "Part", "Customer", "Qty", "Total Price", "Date"};
-    Object[][] data = new Object[list.size()][6];
-
-    for (int i = 0; i < list.size(); i++) {
-        model.Sales s = list.get(i);
-        data[i][0] = s.getSalesId();
-        data[i][1] = s.getPartCode();
-        data[i][2] = s.getCustomerId();
-        data[i][3] = s.getQuantity();
-        data[i][4] = s.getTotalPrice();
-        data[i][5] = s.getSaleDate();
+        List<Sales> list = salesDao.displayAllSales();
+        String[] cols = {"Sales ID", "Part", "Customer", "Qty", "Total Price", "Date"};
+        Object[][] data = new Object[list.size()][6];
+        
+        for (int i = 0; i < list.size(); i++) {
+            Sales s = list.get(i);
+            data[i][0] = s.getSalesId();
+            data[i][1] = s.getPartCode();
+            data[i][2] = s.getCustomerId();
+            data[i][3] = s.getQuantity();
+            data[i][4] = s.getTotalPrice();
+            data[i][5] = s.getSaleDate();
+        }
+        
+        salesTable.setModel(new DefaultTableModel(data, cols) {
+            public boolean isCellEditable(int row, int column) { return false; }
+        });
     }
-
-    salesTable.setModel(new javax.swing.table.DefaultTableModel(data, cols));
-}
 
     private void loadPartsToCombo() {
-    dao.PartDao dao = new dao.PartDaoImpl();
-    java.util.List<model.Part> list = dao.displayAllParts();
-    partComboTxt.removeAllItems();
-    for (model.Part p : list) {
-        partComboTxt.addItem(p.getPartCode()); 
+        PartDao dao = new PartDaoImpl();
+        List<model.Part> list = dao.displayAllParts();
+        partComboTxt.removeAllItems();
+        for (model.Part p : list) {
+            partComboTxt.addItem(p.getPartCode());
+        }
     }
-}
 
-private void loadCustomersToCombo() {
-    dao.CustomerDao dao = new dao.CustomerDaoImpl();
-    java.util.List<model.Customer> list = dao.displayAllCustomers();
-    customerComboTxt.removeAllItems();
-    for (model.Customer c : list) {
-        customerComboTxt.addItem(c.getCustomerId()); 
+    private void loadCustomersToCombo() {
+        CustomerDao dao = new CustomerDaoImpl();
+        List<Customer> list = dao.displayAllCustomers();
+        customerComboTxt.removeAllItems();
+        for (Customer c : list) {
+            customerComboTxt.addItem(c.getCustomerId());
+        }
     }
-}
 
+    public static void main(String args[]) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ex) {
+            logger.log(java.util.logging.Level.SEVERE, null, ex);
+        }
+        EventQueue.invokeLater(new Runnable() {
+            public void run() { new SalesManagement().setVisible(true); }
+        });
+    }
 }

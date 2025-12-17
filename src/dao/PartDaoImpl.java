@@ -47,7 +47,9 @@ public class PartDaoImpl implements PartDao {
             return rowsAffected;
             
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Error creating part: " + partObj.getPartCode(), e);
+            // Log concise message only; UI will tell user what went wrong
+            LOGGER.log(Level.WARNING, "Error creating part {0}: {1}",
+                    new Object[]{partObj.getPartCode(), e.getMessage()});
             return 0;
         }
     }
