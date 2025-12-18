@@ -578,8 +578,13 @@ public class PartManagement extends JFrame {
 
     private void loadPartsToTable() {
         List<Part> parts = partDao.displayAllParts();
-        String[] cols = {"Code", "Name", "Brand", "Price", "Stock", "Category ID", "Supplier ID"};
-        Object[][] data = new Object[parts.size()][7];
+        SupplierDao supplierDao = new SupplierDaoImpl();
+
+        String[] cols = {
+                "Code", "Name", "Brand", "Price", "Stock",
+                "Category ID", "Supplier ID", "Supplier Name"
+        };
+        Object[][] data = new Object[parts.size()][8];
 
         for (int i = 0; i < parts.size(); i++) {
             Part p = parts.get(i);
@@ -590,6 +595,9 @@ public class PartManagement extends JFrame {
             data[i][4] = p.getStockQuantity();
             data[i][5] = p.getCategoryId();
             data[i][6] = p.getSupplierId();
+
+            Supplier supplier = supplierDao.searchByCode(p.getSupplierId());
+            data[i][7] = (supplier != null) ? supplier.getSupplierNames() : "";
         }
 
         partTable.setModel(new DefaultTableModel(data, cols) {

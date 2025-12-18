@@ -23,7 +23,8 @@ public class SalesManagement extends JFrame {
     private JPanel mainPanel, headerPanel, contentPanel, formPanel, buttonPanel, tablePanel;
     private JLabel titleLabel, subtitleLabel;
     private JTextField salesIdTxt, quantityTxt, totalPriceTxt, salesDateTxt;
-    private JComboBox<String> partComboTxt, customerComboTxt;
+    private JComboBox<PartItem> partComboTxt;
+    private JComboBox<CustomerItem> customerComboTxt;
     private JButton backButton, searchBtn, saveBtn, displayBtn;
     private JScrollPane tableScrollPane;
     private JTable salesTable;
@@ -139,8 +140,8 @@ public class SalesManagement extends JFrame {
         ));
 
         addFormField("Sales ID", salesIdTxt = createTextField());
-        addFormCombo("Select Part", partComboTxt = createComboBox());
-        addFormCombo("Select Customer", customerComboTxt = createComboBox());
+        addFormCombo("Select Part", partComboTxt = createPartCombo());
+        addFormCombo("Select Customer", customerComboTxt = createCustomerCombo());
         addFormField("Quantity", quantityTxt = createTextField());
         addFormField("Total Price", totalPriceTxt = createTextField());
         addFormField("Sale Date (yyyy-MM-dd)", salesDateTxt = createTextField());
@@ -251,7 +252,7 @@ public class SalesManagement extends JFrame {
         formPanel.add(field);
     }
 
-    private void addFormCombo(String labelText, JComboBox<String> combo) {
+    private void addFormCombo(String labelText, JComponent combo) {
         JLabel label = createLabel(labelText);
         label.setBorder(new EmptyBorder(15, 0, 0, 0));
         formPanel.add(label);
@@ -280,8 +281,18 @@ public class SalesManagement extends JFrame {
         return field;
     }
 
-    private JComboBox<String> createComboBox() {
-        JComboBox<String> combo = new JComboBox<String>();
+    private JComboBox<PartItem> createPartCombo() {
+        JComboBox<PartItem> combo = new JComboBox<>();
+        combo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        combo.setBackground(UITheme.SURFACE);
+        combo.setBorder(new LineBorder(new Color(200, 200, 200), 1, true));
+        combo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
+        combo.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return combo;
+    }
+
+    private JComboBox<CustomerItem> createCustomerCombo() {
+        JComboBox<CustomerItem> combo = new JComboBox<>();
         combo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         combo.setBackground(UITheme.SURFACE);
         combo.setBorder(new LineBorder(new Color(200, 200, 200), 1, true));
@@ -336,8 +347,15 @@ public class SalesManagement extends JFrame {
 
             Sales s = new Sales();
             s.setSalesId(salesIdTxt.getText().trim());
-            s.setPartCode(partComboTxt.getSelectedItem().toString());
-            s.setCustomerId(customerComboTxt.getSelectedItem().toString());
+
+            PartItem partItem = (PartItem) partComboTxt.getSelectedItem();
+            CustomerItem customerItem = (CustomerItem) customerComboTxt.getSelectedItem();
+            if (partItem != null) {
+                s.setPartCode(partItem.getCode());
+            }
+            if (customerItem != null) {
+                s.setCustomerId(customerItem.getId());
+            }
             s.setQuantity(qty);
             s.setTotalPrice(price);
             s.setSaleDate(saleDate);
@@ -366,8 +384,8 @@ public class SalesManagement extends JFrame {
             JOptionPane.showMessageDialog(this, "Sale not found!", "Not Found", JOptionPane.INFORMATION_MESSAGE);
             clearFields();
         } else {
-            partComboTxt.setSelectedItem(s.getPartCode());
-            customerComboTxt.setSelectedItem(s.getCustomerId());
+            selectPartByCode(s.getPartCode());
+            selectCustomerById(s.getCustomerId());
             quantityTxt.setText(String.valueOf(s.getQuantity()));
             totalPriceTxt.setText(String.valueOf(s.getTotalPrice()));
             salesDateTxt.setText(String.valueOf(s.getSaleDate()));
@@ -413,14 +431,26 @@ public class SalesManagement extends JFrame {
 
     private void loadSalesToTable() {
         List<Sales> list = salesDao.displayAllSales();
+        PartDao partDao = new PartDaoImpl();
+        CustomerDao customerDao = new CustomerDaoImpl();
+
         String[] cols = {"Sales ID", "Part", "Customer", "Qty", "Total Price", "Date"};
         Object[][] data = new Object[list.size()][6];
         
         for (int i = 0; i < list.size(); i++) {
             Sales s = list.get(i);
             data[i][0] = s.getSalesId();
-            data[i][1] = s.getPartCode();
-            data[i][2] = s.getCustomerId();
+
+            Part part = partDao.searchByCode(s.getPartCode());
+            String partName = (part != null) ? part.getPartName() : s.getPartCode();
+            data[i][1] = partName;
+
+            Customer c = customerDao.searchById(s.getCustomerId());
+            String fullName = (c != null)
+                    ? c.getCustomerFirstName() + " " + c.getCustomerLastName()
+                    : s.getCustomerId();
+            data[i][2] = fullName;
+
             data[i][3] = s.getQuantity();
             data[i][4] = s.getTotalPrice();
             data[i][5] = s.getSaleDate();
@@ -436,7 +466,7 @@ public class SalesManagement extends JFrame {
         List<model.Part> list = dao.displayAllParts();
         partComboTxt.removeAllItems();
         for (model.Part p : list) {
-            partComboTxt.addItem(p.getPartCode());
+            partComboTxt.addItem(new PartItem(p.getPartCode(), p.getPartName()));
         }
     }
 
@@ -445,7 +475,72 @@ public class SalesManagement extends JFrame {
         List<Customer> list = dao.displayAllCustomers();
         customerComboTxt.removeAllItems();
         for (Customer c : list) {
-            customerComboTxt.addItem(c.getCustomerId());
+            String fullName = c.getCustomerFirstName() + " " + c.getCustomerLastName();
+            customerComboTxt.addItem(new CustomerItem(c.getCustomerId(), fullName));
+        }
+    }
+
+    private void selectPartByCode(String code) {
+        if (code == null) {
+            return;
+        }
+        for (int i = 0; i < partComboTxt.getItemCount(); i++) {
+            PartItem item = partComboTxt.getItemAt(i);
+            if (item.getCode().equals(code)) {
+                partComboTxt.setSelectedIndex(i);
+                break;
+            }
+        }
+    }
+
+    private void selectCustomerById(String customerId) {
+        if (customerId == null) {
+            return;
+        }
+        for (int i = 0; i < customerComboTxt.getItemCount(); i++) {
+            CustomerItem item = customerComboTxt.getItemAt(i);
+            if (item.getId().equals(customerId)) {
+                customerComboTxt.setSelectedIndex(i);
+                break;
+            }
+        }
+    }
+
+    private static class PartItem {
+        private final String code;
+        private final String name;
+
+        PartItem(String code, String name) {
+            this.code = code;
+            this.name = name;
+        }
+
+        String getCode() {
+            return code;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    private static class CustomerItem {
+        private final String id;
+        private final String fullName;
+
+        CustomerItem(String id, String fullName) {
+            this.id = id;
+            this.fullName = fullName;
+        }
+
+        String getId() {
+            return id;
+        }
+
+        @Override
+        public String toString() {
+            return fullName;
         }
     }
 
