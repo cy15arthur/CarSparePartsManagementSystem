@@ -169,6 +169,23 @@ public class Signup extends JFrame {
             return;
         }
 
+        if (password.trim().length() < 5) {
+            JOptionPane.showMessageDialog(this,
+                    "Password is too short.\nPlease use at least 5 characters.",
+                    "Weak Password",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Very simple email validation: only if user filled it in
+        if (!email.isEmpty() && !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            JOptionPane.showMessageDialog(this,
+                    "Email address looks invalid.\nExample: user@example.com",
+                    "Invalid Email",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         if (!password.equals(confirmPassword)) {
             JOptionPane.showMessageDialog(this,
                     "Passwords do not match.",

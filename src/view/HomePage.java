@@ -29,7 +29,7 @@ public class HomePage extends JFrame {
     private JLabel roleLabel;
     private JButton logoutButton;
 
-    // Cards
+    // Cards (staff dashboard)
     private JPanel partsCard;
     private JLabel partsIconLabel;
     private JLabel partsTitleLabel;
@@ -44,11 +44,6 @@ public class HomePage extends JFrame {
     private JLabel salesIconLabel;
     private JLabel salesTitleLabel;
     private JLabel salesDescLabel;
-
-    private JPanel suppliersCard;
-    private JLabel suppliersIconLabel;
-    private JLabel suppliersTitleLabel;
-    private JLabel suppliersDescLabel;
 
     public HomePage() {
         initComponents();
@@ -139,7 +134,7 @@ public class HomePage extends JFrame {
         contentPanel.setBackground(UITheme.BACKGROUND_LIGHT);
         contentPanel.setBorder(new EmptyBorder(40, 40, 40, 40));
 
-        // 2x2 grid so all tiles are visible without resizing
+        // 2x2 grid; currently used for 3 staff tiles
         gridPanel = new JPanel(new GridLayout(2, 2, 30, 30));
         gridPanel.setBackground(UITheme.BACKGROUND_LIGHT);
 
@@ -188,25 +183,9 @@ public class HomePage extends JFrame {
             }
         });
 
-        // Suppliers card
-        suppliersCard = new JPanel();
-        suppliersIconLabel = new JLabel();
-        suppliersTitleLabel = new JLabel();
-        suppliersDescLabel = new JLabel();
-        setupCard(suppliersCard, suppliersIconLabel, suppliersTitleLabel, suppliersDescLabel,
-                "🏭", "Suppliers", "Manage supplier information", UITheme.ACCENT_PINK);
-        suppliersCard.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                new SupplierManagement().setVisible(true);
-                dispose();
-            }
-        });
-
         gridPanel.add(partsCard);
         gridPanel.add(customersCard);
         gridPanel.add(salesCard);
-        gridPanel.add(suppliersCard);
 
         contentPanel.add(gridPanel, BorderLayout.CENTER);
         mainPanel.add(contentPanel, BorderLayout.CENTER);

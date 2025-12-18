@@ -98,7 +98,11 @@ public class PartManagement extends JFrame {
         backButton.setPreferredSize(new Dimension(180, 40));
 
         backButton.addActionListener(e -> {
-            new AdminDashboard().setVisible(true);
+            if (Login.getCurrentUser() != null && Login.getCurrentUser().isAdmin()) {
+                new AdminDashboard().setVisible(true);
+            } else {
+                new HomePage().setVisible(true);
+            }
             dispose();
         });
 

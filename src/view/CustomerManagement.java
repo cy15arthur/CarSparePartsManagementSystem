@@ -82,7 +82,11 @@ public class CustomerManagement extends JFrame {
         
         backButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
-                new AdminDashboard().setVisible(true);
+                if (Login.getCurrentUser() != null && Login.getCurrentUser().isAdmin()) {
+                    new AdminDashboard().setVisible(true);
+                } else {
+                    new HomePage().setVisible(true);
+                }
                 dispose();
             }
         });

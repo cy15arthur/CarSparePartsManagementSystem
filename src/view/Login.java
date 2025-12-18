@@ -258,6 +258,13 @@ public class Login extends JFrame {
                     JOptionPane.ERROR_MESSAGE);
             return;
         }
+        if (newPassword.trim().length() < 5) {
+            JOptionPane.showMessageDialog(this,
+                    "New password is too short.\nPlease use at least 5 characters.",
+                    "Weak Password",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
 
         user.setPassword(newPassword);
         int rows = userDao.update(user);
